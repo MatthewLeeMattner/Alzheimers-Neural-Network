@@ -2,15 +2,17 @@ import tensorflow as tf
 import numpy as np
 from time import time
 from data_helper import get_dummy_patches
+from model_helper import ModelHelper
 # tf.enable_eager_execution()
 
 train, test, val = get_dummy_patches()
 
 
-class Autoencoder:
+class Autoencoder(ModelHelper):
 
     def __init__(self, load=False, name=None, location=None):
         self.model = self.model_define()
+        self.set_model(self.model)
         self.model.compile(optimizer=tf.train.AdamOptimizer(0.02), loss="mse")
         self.model.predict(np.random.randn(1, 5, 5, 5))
         if load is True:
