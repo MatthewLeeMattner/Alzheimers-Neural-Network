@@ -3,6 +3,7 @@ import numpy as np
 from time import time
 from data_helper import get_dummy_patches
 from model_helper import ModelHelper
+import utils
 # tf.enable_eager_execution()
 
 train, test, val = get_dummy_patches()
@@ -54,7 +55,11 @@ class Autoencoder(ModelHelper):
         return model
 
 
+def pipeline(patches):
+    pass
 
+def setup_data(input_dir):
+    # Load data and split by subject
 
 if __name__ == "__main__":
     autoencoder = Autoencoder()
@@ -72,16 +77,3 @@ if __name__ == "__main__":
     display_comparison_batch(input_imgs[:, :, :, 3], output[:, :, :, 3])
     plt.show()
 
-'''
-print(model.summary())
-
-
-
-from model_helper import ModelHelper
-helper = ModelHelper(model)
-layer_kernel = helper.get_layer_kernel("encoded")
-print(layer_kernel.shape)
-print(layer_kernel)
-
-
-'''

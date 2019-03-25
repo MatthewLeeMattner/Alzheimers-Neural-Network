@@ -6,7 +6,7 @@ library(scales)
 library(neurobase)
 library(fslr)
 library("extrantsr")
-
+graphics.off()
 setwd("~/Projects/MRI_Autoencoder")
 MNI_templatePath <-"~/Data/ADNI/eva/"
 
@@ -31,44 +31,47 @@ removeSubset <- function(primary, subset){
 }
 
 normalise_MIN152 <- function(inT1FilePath, MNI_t1_brain, outDir){
-  
-  print(paste0("current input file: ", inT1FilePath, " ***"))
-  print(inT1FilePath)
-  #read t1 path
-  t1 <- readnii(inT1FilePath,reorient = FALSE)
-  # brain extraction
-  bet1_T1 = fslbet(t1,retimg = TRUE)
-  double_ortho(t1,bet1_T1)
-  # b: Find the gravity center of bet_T1_v1
-  cog <- cog(bet1_T1,ceil = TRUE)
-  cog <- paste("-c",paste(cog,collapse = " "))
-  #c: re-run at center new cog
-  bet2_T1 = fslbet(bet1_T1,retimg = TRUE,opts = cog)
-  double_ortho(t1,bet2_T1)
-  
-  # register t1 to MNI template T1 space
-  t1 <-nii.stub(inT1FilePath)
-  print(paste0("main file name: ", t1))
-  tks<- strsplit(inT1FilePath,"/")[[1]]
-  t1MainName <- nii.stub(tks[length(tks)])
-  t12MNI152FileName <-paste0(t1MainName,"_MNI.nii.gz")
-  t12MNI152FilePath <- file.path(outDir,t12MNI152FileName)
-  
-  MNI_regT12TemplateT1<- ants_regwrite(filename = bet2_T1,template.file = MNI_t1_brain,
-                                       outfile = t12MNI152FilePath,
-                                       verbose = FALSE,
-                                       typeofTransform = "SyN"
-  )
-  double_ortho(MNI_regT12TemplateT1,MNI_t1_brain)
-  return(MNI_regT12TemplateT1)
+  result = tryCatch({
+    print(paste0("current input file: ", inT1FilePath, " ***"))
+    print(inT1FilePath)
+    #read t1 path
+    t1 <- readnii(inT1FilePath,reorient = FALSE)
+    # brain extraction
+    bet1_T1 = fslbet(t1,retimg = TRUE)
+    #double_ortho(t1,bet1_T1)
+    # b: Find the gravity center of bet_T1_v1
+    cog <- cog(bet1_T1,ceil = TRUE)
+    cog <- paste("-c",paste(cog,collapse = " "))
+    #c: re-run at center new cog
+    bet2_T1 = fslbet(bet1_T1,retimg = TRUE,opts = cog)
+    #double_ortho(t1,bet2_T1)
+    
+    # register t1 to MNI template T1 space
+    t1 <-nii.stub(inT1FilePath)
+    print(paste0("main file name: ", t1))
+    tks<- strsplit(inT1FilePath,"/")[[1]]
+    t1MainName <- nii.stub(tks[length(tks)])
+    t12MNI152FileName <-paste0(t1MainName,"_MNI.nii.gz")
+    t12MNI152FilePath <- file.path(outDir,t12MNI152FileName)
+    
+    MNI_regT12TemplateT1<- ants_regwrite(filename = bet2_T1,template.file = MNI_t1_brain,
+                                         outfile = t12MNI152FilePath,
+                                         verbose = FALSE,
+                                         typeofTransform = "SyN"
+    )
+  }, error = function(e) {
+    
+  })
+  #double_ortho(MNI_regT12TemplateT1,MNI_t1_brain)
+
 }#End function
 
 
 #step 1: loading MNI152 template
 MNI_T1_1mm_brain_File <- file.path(MNI_templatePath,"MNI152_T1_1mm_brain_181x217x181.nii")
 MNI_t1_brain <- readnii(MNI_T1_1mm_brain_File,reorient = FALSE)
-orthographic(MNI_t1_brain)
-
+#orthographic(MNI_t1_brain)
+graphics.off()
 #step 2: check output directory
 normPath <-"~/Data/ADNI/2Yr_1.5T_norm"
 if(dir.exists(normPath)){
@@ -85,7 +88,7 @@ tks<- strsplit(inFilePath,"/")[[1]]
 inFileMainName <- nii.stub(tks[length(tks)])
 t1_MNI152 <-paste0(inFileMainName,"_MNI.nii.gz")
 # invoking the function normalise_MIN152
-normalise_MIN152(inFilePath,MNI_t1_brain,normPath)
+# normalise_MIN152(inFilePath, MNI_t1_brain, normPath)
 inputDir <- '~/Data/ADNI/2Yr_1.5T'
 outputFilesVector <- list.files(normPath)
 inputFilesVector <- list.files(inputDir, recursive = TRUE)
