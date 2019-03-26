@@ -1,9 +1,10 @@
 import os
+from os import listdir
 from os.path import join
 import numpy as np
 import nibabel as nib
 import random
-from random import randint
+from random import randint, shuffle
 
 
 def get_nifti_files(data_dir):
@@ -226,8 +227,48 @@ def train_test_val_by_subject(train_percent,
     return train_x, train_y, test_x, test_y, val_x, val_y
 
 
+def patch_generator(directory, dataset="train", batch=32):
+    files = listdir(directory)
+    X = []
+    for f in files:
+        dataset_type, index = f.split("_")
+        index = int(index.split(".")[0])
+        if dataset_type == dataset:
+            X.append(f)
+    shuffle(X)
+    while True:
+        x = random.choice(X)
+        patches = np.load(join(directory, x))
+        for i in range(int(len(patches)/batch)):
+            batch_patch = patches[i*batch:i*batch+batch]
+            yield batch_patch, batch_patch
+
+
+def batch_generator(directory, dataset="train"):
+    files = listdir(directory)
+    X = []
+    y = []
+    for f in files:
+        dataset_type, index, x_or_y = f.split("_")
+        x_or_y = x_or_y.split(".")[0]
+        if dataset_type == dataset:
+            if x_or_y == 'x':
+                X.append((f, int(index)))
+            elif x_or_y == 'y':
+                y.append((f, int(index)))
+    X.sort(key=lambda x: x[1])
+    y.sort(key=lambda x: x[1])
+    while True:
+        index = randint(0, len(X)-1)
+        feature = np.expand_dims(np.load(join(directory, X[index][0])), axis=4)[:, 50:-50, 60:-60, 50:-50]
+        label = np.load(join(directory, y[index][0]))
+        for f, l in zip(feature, label):
+            yield np.expand_dims(f, axis=0), np.expand_dims(l, axis=0)
+
+
 if __name__ == "__main__":
-    img_location = "/home/matthew-lee/Data/ADNI/2Yr_1.5T_norm/"\
-        "ADNI_005_S_0546_MR_MPR__GradWarp__B1_Correction__N3__Scaled_Br_"\
-        "20080318131759141_S46353_I98738_MNI.nii"
-    train_test_val_by_subject(0.7)
+    batch_dir = "/home/matthew-lee/Data/ADNI/clean/batches/"
+    batch_gen = batch_generator(batch_dir, "train")
+    for feature, label in batch_gen:
+        print(feature.shape)
+        print(label.shape)

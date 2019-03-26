@@ -1,3 +1,7 @@
+from time import time
+import tensorflow as tf
+
+
 class ModelHelper():
 
     def set_model(self, model):
@@ -21,7 +25,7 @@ class ModelHelper():
         return self.model
 
     def save_model(self, name, location="models"):
-        if name=None:
+        if name is None:
             raise ValueError("No name provided to save model")
         curr_time = time()
         print("Saving model {}/{}-{}".format(location, curr_time, name))
@@ -30,6 +34,7 @@ class ModelHelper():
             "{}/{}-{}".format(location, curr_time, name),
             overwrite=False
         )
+
 
 if __name__ == "__main__":
     from autoencoder import Autoencoder

@@ -2,12 +2,13 @@ import numpy as np
 import pandas as pd
 import utils
 import math
+from tqdm import tqdm
 from os import listdir
 from os.path import join
 
-GET_DATASET_SPLIT = False
-CREATE_SINGLES = False
-BATCH_SINGLES = False
+GET_DATASET_SPLIT = True
+CREATE_SINGLES = True
+BATCH_SINGLES = True
 CREATE_PATCHES = True
 
 DATA_DIR = "/home/matthew-lee/Data/ADNI/2Yr_1.5T_norm/"
@@ -22,7 +23,7 @@ NORMALIZED_PATH = join(DATA_CLEAN, "normalized")
 
 CATEGORIES = ["CN", "MCI", "AD"]
 
-TRAIN_PERCENT = 0.7
+TRAIN_PERCENT = 0.6
 BATCH_SIZE = 32
 KERNEL = (5, 5, 5)
 SLICES = 100
@@ -35,9 +36,14 @@ INFO_DF = pd.read_csv(CSV_INFO)
 
 def image_pipeline(x):
     # TODO: normalize images
+    mean = np.mean(x)
+    std = np.std(x)
+    return (x - mean) / std
+
 
 def save_as_numpy_singles(feature, label, name, name_type):
     feature = np.array(feature.dataobj)
+    feature = image_pipeline(feature)
     np.save(
         join(SINGLES_PATH, "{}_{}_x.npy".format(name, name_type)), feature
     )
@@ -70,21 +76,19 @@ def merge_numpy_batch(x_file_list, y_file_list, name):
         np.save(join(BATCHES_PATH, "{}_{}_y.npy".format(name, i)), batch_y)
 
 
-
 ########################################
 #           SPLIT DATASET
 ########################################
 if GET_DATASET_SPLIT:
-# Setup train test val split
+    # Setup train test val split
+    print("Splitting dataset")
     dataset = utils.train_test_val_by_subject(TRAIN_PERCENT,
-                                            SUBJECT_LIST,
-                                            CATEGORIES,
-                                            FILE_LIST,
-                                            DATA_DIR,
-                                            INFO_DF)
+                                              SUBJECT_LIST,
+                                              CATEGORIES,
+                                              FILE_LIST,
+                                              DATA_DIR,
+                                              INFO_DF)
     train_x, train_y, test_x, test_y, val_x, val_y = dataset
-
-
 
     print(len(train_x), len(train_y))
     print(len(test_x), len(test_y))
@@ -94,18 +98,22 @@ if GET_DATASET_SPLIT:
 #          CREATE SINGLE IMAGES
 ########################################
 if CREATE_SINGLES:
+    print("Creating singles")
+    print("Training singles:")
     iterator = 0
-    for feature, label in zip(train_x, train_y):
+    for feature, label in zip(tqdm(train_x), train_y):
         save_as_numpy_singles(feature, label, iterator, "train")
         iterator += 1
 
+    print("Testing singles:")
     iterator = 0
-    for feature, label in zip(test_x, test_y):
+    for feature, label in zip(tqdm(test_x), test_y):
         save_as_numpy_singles(feature, label, iterator, "test")
         iterator += 1
 
+    print("Validation singles:")
     iterator = 0
-    for feature, label in zip(val_x, val_y):
+    for feature, label in zip(tqdm(val_x), val_y):
         save_as_numpy_singles(feature, label, iterator, "val")
         iterator += 1
 
@@ -123,7 +131,8 @@ if BATCH_SINGLES:
     test_files_y = []
     val_files_y = []
 
-    for f in single_files:
+    print("Batching singles:")
+    for f in tqdm(single_files):
         _, f_type, f_type_usage = f.split("_")
         f_type_usage = f_type_usage.split(".")[0]
         if f_type == "train":
@@ -162,12 +171,13 @@ if BATCH_SINGLES:
 #            CREATE PATCHES
 ########################################
 if CREATE_PATCHES:
-    print("Create patches")
+    print("Creating patches:")
     batch_files = listdir(join(DATA_CLEAN, BATCHES_PATH))
 
     train_iter = 0
     test_iter = 0
-    val_iter = 0 for f in batch_files:
+    val_iter = 0
+    for f in tqdm(batch_files):
         b_type, b_index, b_usage = f.split("_")
         b_usage = b_usage.split(".")[0]
         if b_usage == "x":
@@ -177,21 +187,21 @@ if CREATE_PATCHES:
             if b_type == "train":
                 np.save(
                     join(DATA_CLEAN, PATCHES_PATH,
-                        "train_{}.npy".format(train_iter)),
+                         "train_{}.npy".format(train_iter)),
                     patches
                 )
                 train_iter += 1
             elif b_type == "test":
                 np.save(
                     join(DATA_CLEAN, PATCHES_PATH,
-                        "test_{}.npy".format(test_iter)),
+                         "test_{}.npy".format(test_iter)),
                     patches
                 )
                 test_iter += 1
             elif b_type == "val":
                 np.save(
                     join(DATA_CLEAN, PATCHES_PATH,
-                        "val_{}.npy".format(val_iter)),
+                         "val_{}.npy".format(val_iter)),
                     patches
                 )
                 val_iter += 1
