@@ -1,5 +1,6 @@
 from time import time
 import tensorflow as tf
+from tensorflow.keras.models import Model
 
 
 class ModelHelper():
@@ -34,6 +35,17 @@ class ModelHelper():
             "{}/{}-{}".format(location, curr_time, name),
             overwrite=False
         )
+
+    def pop(self):
+        x = self.model.layers[-2].output
+        self.model = Model(inputs=self.model.inputs, outputs=x)
+        return self.model
+
+    def add(self, layer):
+        x = self.model.layers[-1].output
+        x = layer(x)
+        self.model = Model(inputs=self.model.inputs, outputs=x)
+        return self.model
 
 
 if __name__ == "__main__":

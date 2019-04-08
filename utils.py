@@ -170,6 +170,31 @@ def paired_shuffle(list_1, list_2):
     return list_1, list_2
 
 
+def softmax(z):
+    z = [z]
+    s = np.max(z, axis=1)
+    s = s[:, np.newaxis]
+    e_x = np.exp(z - s)
+    div = np.sum(e_x, axis=1)
+    div = div[:, np.newaxis]
+    return e_x / div
+
+
+def calculate_class_weightings(labels, categories):
+    label_counts = [0] * len(categories)
+    for label in labels:
+        i = np.argmax(label)
+        label_counts[i] += 1
+    weightings = [0] * len(categories)
+    for i in range(len(label_counts)):
+        weightings[i] = sum(label_counts) / label_counts[i]
+    weightings = softmax(weightings)[0]
+    weight_dict = {}
+    for i in range(len(weightings)):
+        weight_dict["{}".format(i)] = weightings[i]
+    return weight_dict
+
+
 def train_test_val_by_subject(train_percent,
                               subjects,
                               categories,
@@ -218,13 +243,16 @@ def train_test_val_by_subject(train_percent,
         np.array([get_label_indexes(x, categories) for x in val_y])
     )
 
+    # Get training weightings for each class
+    weightings = calculate_class_weightings(train_y, categories)
+
     # Shuffle again with seperation performed
     train_x, train_y = paired_shuffle(train_x, train_y)
     test_x, test_y = paired_shuffle(test_x, test_y)
     val_x, val_y = paired_shuffle(val_x, val_y)
 
     # Return the train, test and val set
-    return train_x, train_y, test_x, test_y, val_x, val_y
+    return train_x, train_y, test_x, test_y, val_x, val_y, weightings
 
 
 def patch_generator(directory, dataset="train", batch=32):
@@ -241,6 +269,7 @@ def patch_generator(directory, dataset="train", batch=32):
         patches = np.load(join(directory, x))
         for i in range(int(len(patches)/batch)):
             batch_patch = patches[i*batch:i*batch+batch]
+            batch_patch = np.expand_dims(batch_patch, axis=4)
             yield batch_patch, batch_patch
 
 
@@ -260,15 +289,57 @@ def batch_generator(directory, dataset="train"):
     y.sort(key=lambda x: x[1])
     while True:
         index = randint(0, len(X)-1)
-        feature = np.expand_dims(np.load(join(directory, X[index][0])), axis=4)[:, 50:-50, 60:-60, 50:-50]
+        feature = np.expand_dims(np.load(join(directory, X[index][0])), axis=4)
         label = np.load(join(directory, y[index][0]))
         for f, l in zip(feature, label):
             yield np.expand_dims(f, axis=0), np.expand_dims(l, axis=0)
 
 
 if __name__ == "__main__":
-    batch_dir = "/home/matthew-lee/Data/ADNI/clean/batches/"
-    batch_gen = batch_generator(batch_dir, "train")
-    for feature, label in batch_gen:
-        print(feature.shape)
-        print(label.shape)
+    import pandas as pd
+    DATA_DIR = "/home/matthew-lee/Data/ADNI/2Yr_1.5T_norm/"
+    CSV_INFO = "/home/matthew-lee/Data/ADNI/2Yr_1.5T/" \
+        "ADNI1_Complete_2Yr_1.5T_3_17_2019.csv"
+    DATA_CLEAN = "/home/matthew-lee/Data/ADNI/clean/"
+
+    CATEGORIES = ["CN", "MCI", "AD"]
+
+    TRAIN_PERCENT = 0.7
+    BATCH_SIZE = 5
+    KERNEL = (12, 12, 12)
+    SLICES = 100
+
+    FILE_LIST = get_nifti_files(DATA_DIR)
+    SUBJECT_LIST = get_subject_list(FILE_LIST)
+
+    INFO_DF = pd.read_csv(CSV_INFO)
+
+    train_test_val_by_subject(TRAIN_PERCENT,
+                              SUBJECT_LIST,
+                              CATEGORIES,
+                              FILE_LIST,
+                              DATA_DIR,
+                              INFO_DF)
+    '''
+    dataset = "val"
+    directory = "/home/matthew-lee/Data/ADNI/clean/batches/"
+    files = listdir(directory)
+    X = []
+    y = []
+    for f in files:
+        dataset_type, index, x_or_y = f.split("_")
+        x_or_y = x_or_y.split(".")[0]
+        if dataset_type == dataset:
+            if x_or_y == 'x':
+                X.append((f, int(index)))
+            elif x_or_y == 'y':
+                y.append((f, int(index)))
+    labels_count = [0, 0, 0]
+    for label in y:
+        label = np.load(join(directory, label[0]))
+        label_index = np.argmax(label, axis=1)
+        for i in label_index:
+            labels_count[i] += 1
+    print(labels_count)
+    print(sum(labels_count))
+    '''

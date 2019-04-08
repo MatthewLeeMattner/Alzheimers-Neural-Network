@@ -5,6 +5,8 @@ import math
 from tqdm import tqdm
 from os import listdir
 from os.path import join
+import nibabel as nib
+from image_manipulation import data_pipeline
 
 GET_DATASET_SPLIT = True
 CREATE_SINGLES = True
@@ -23,9 +25,9 @@ NORMALIZED_PATH = join(DATA_CLEAN, "normalized")
 
 CATEGORIES = ["CN", "MCI", "AD"]
 
-TRAIN_PERCENT = 0.6
-BATCH_SIZE = 32
-KERNEL = (5, 5, 5)
+TRAIN_PERCENT = 0.7
+BATCH_SIZE = 5
+KERNEL = (12, 12, 12)
 SLICES = 100
 
 FILE_LIST = utils.get_nifti_files(DATA_DIR)
@@ -33,12 +35,14 @@ SUBJECT_LIST = utils.get_subject_list(FILE_LIST)
 
 INFO_DF = pd.read_csv(CSV_INFO)
 
+TEMPLATE = nib.load("/home/matthew-lee/Data/ADNI/"
+                    "eva/MNI152_T1_1mm_brain_181x217x181.nii")
+TEMPLATE_NP = TEMPLATE.get_fdata()
+
 
 def image_pipeline(x):
-    # TODO: normalize images
-    mean = np.mean(x)
-    std = np.std(x)
-    return (x - mean) / std
+    image = data_pipeline(x, TEMPLATE_NP)
+    return image
 
 
 def save_as_numpy_singles(feature, label, name, name_type):
@@ -64,7 +68,7 @@ def merge_numpy_singles(x_file_list, y_file_list):
 
 
 def merge_numpy_batch(x_file_list, y_file_list, name):
-    for i in range(math.ceil(len(x_file_list) / BATCH_SIZE)):
+    for i in tqdm(range(math.ceil(len(x_file_list) / BATCH_SIZE))):
         if i*BATCH_SIZE + BATCH_SIZE < len(x_file_list):
             batch_x = x_file_list[i * BATCH_SIZE: i * BATCH_SIZE + BATCH_SIZE]
             batch_y = y_file_list[i * BATCH_SIZE: i * BATCH_SIZE + BATCH_SIZE]
@@ -88,8 +92,8 @@ if GET_DATASET_SPLIT:
                                               FILE_LIST,
                                               DATA_DIR,
                                               INFO_DF)
-    train_x, train_y, test_x, test_y, val_x, val_y = dataset
-
+    train_x, train_y, test_x, test_y, val_x, val_y, weightings = dataset
+    np.save(join(DATA_CLEAN, "train_weightings.npy"), weightings)
     print(len(train_x), len(train_y))
     print(len(test_x), len(test_y))
     print(len(val_x), len(val_y))
@@ -99,13 +103,13 @@ if GET_DATASET_SPLIT:
 ########################################
 if CREATE_SINGLES:
     print("Creating singles")
-    print("Training singles:")
+    print("Train singles:")
     iterator = 0
     for feature, label in zip(tqdm(train_x), train_y):
         save_as_numpy_singles(feature, label, iterator, "train")
         iterator += 1
 
-    print("Testing singles:")
+    print("Test singles:")
     iterator = 0
     for feature, label in zip(tqdm(test_x), test_y):
         save_as_numpy_singles(feature, label, iterator, "test")
@@ -132,7 +136,7 @@ if BATCH_SINGLES:
     val_files_y = []
 
     print("Batching singles:")
-    for f in tqdm(single_files):
+    for f in single_files:
         _, f_type, f_type_usage = f.split("_")
         f_type_usage = f_type_usage.split(".")[0]
         if f_type == "train":
